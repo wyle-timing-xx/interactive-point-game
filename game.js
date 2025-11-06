@@ -3,52 +3,51 @@ class PointTracker {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     
-    // 定义更加曲折的路径，带有严格的顺序
+    // 定义更加精确的路径连接
     this.path = [
       { 
         point: { x: 100, y: 50 }, 
-        number: 1, 
-        nextPoints: [2],
+        number: 1,
         pathPoints: [
           { x: 100, y: 50 },
           { x: 150, y: 30 },
-          { x: 200, y: 50 }
+          { x: 200, y: 50 },
+          { x: 250, y: 50 }
         ]
       },
       { 
         point: { x: 250, y: 50 }, 
-        number: 2, 
-        nextPoints: [3],
+        number: 2,
         pathPoints: [
           { x: 250, y: 50 },
           { x: 280, y: 100 },
-          { x: 250, y: 150 }
+          { x: 250, y: 150 },
+          { x: 250, y: 200 }
         ]
       },
       { 
         point: { x: 250, y: 200 }, 
-        number: 3, 
-        nextPoints: [4],
+        number: 3,
         pathPoints: [
           { x: 250, y: 200 },
           { x: 200, y: 250 },
-          { x: 150, y: 200 }
+          { x: 150, y: 200 },
+          { x: 100, y: 200 }
         ]
       },
       { 
         point: { x: 100, y: 200 }, 
-        number: 4, 
-        nextPoints: [5],
+        number: 4,
         pathPoints: [
           { x: 100, y: 200 },
-          { x: 80, y: 300 },
+          { x: 80, y: 250 },
+          { x: 100, y: 300 },
           { x: 100, y: 350 }
         ]
       },
       { 
         point: { x: 100, y: 350 }, 
-        number: 5, 
-        nextPoints: [],
+        number: 5,
         pathPoints: [
           { x: 100, y: 350 }
         ]
@@ -60,8 +59,7 @@ class PointTracker {
       y: 50, 
       currentPointIndex: 0,
       targetPointIndex: null,
-      pathProgress: 0,
-      currentPathProgress: 0
+      pathProgress: 0
     };
 
     this.isMoving = false;
@@ -96,21 +94,20 @@ class PointTracker {
     };
   }
 
-  // 绘制曲折路径
-  drawWinidngPath() {
+  // 绘制连续路径
+  drawConnectedPath() {
     this.ctx.beginPath();
     this.path.forEach((pathPoint, index) => {
-      if (index < this.path.length - 1) {
-        const points = pathPoint.pathPoints;
-        this.ctx.moveTo(points[0].x, points[0].y);
-        
-        // 绘制路径上的所有点
-        points.forEach((point, pIndex) => {
-          if (pIndex > 0) {
-            this.ctx.lineTo(point.x, point.y);
-          }
-        });
-      }
+      const points = pathPoint.pathPoints;
+      
+      // 绘制路径
+      points.forEach((point, pIndex) => {
+        if (pIndex === 0) {
+          this.ctx.moveTo(point.x, point.y);
+        } else {
+          this.ctx.lineTo(point.x, point.y);
+        }
+      });
     });
     
     this.ctx.strokeStyle = 'black';
@@ -129,12 +126,11 @@ class PointTracker {
 
     // 增加路径进度
     this.player.pathProgress += 0.02; // 控制移动速度
-    this.player.currentPathProgress = this.player.pathProgress;
 
     // 获取当前路径上的位置
     const currentPathPoints = currentPath.pathPoints;
     const currentPoint = this.interpolatePoint(
-      this.player.currentPathProgress, 
+      this.player.pathProgress, 
       currentPathPoints
     );
 
@@ -151,15 +147,14 @@ class PointTracker {
       this.player.targetPointIndex = null;
       this.isMoving = false;
       this.player.pathProgress = 0;
-      this.player.currentPathProgress = 0;
     }
   }
 
   animate() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
-    // 绘制曲折路径
-    this.drawWinidngPath();
+    // 绘制连续路径
+    this.drawConnectedPath();
 
     // 移动玩家
     this.movePlayerAlongPath();
@@ -199,13 +194,11 @@ class PointTracker {
     });
 
     if (clickedPoint && !this.isMoving) {
-      // 检查是否是当前点的下一个可选点
-      const currentPath = this.path[this.player.currentPointIndex];
-      if (currentPath.nextPoints.includes(clickedPoint.number)) {
+      // 只能点击下一个顺序的点
+      if (clickedPoint.number === this.path[this.player.currentPointIndex].number + 1) {
         this.player.targetPointIndex = this.path.findIndex(p => p.number === clickedPoint.number);
         this.isMoving = true;
         this.player.pathProgress = 0;
-        this.player.currentPathProgress = 0;
       }
     }
   }
