@@ -77,7 +77,7 @@ class PointTracker {
 
   // 计算插值点
   interpolatePoint(t, points) {
-    if (points.length <= 1) return points[0];
+    if (!points || points.length <= 1) return points[0] || { x: 0, y: 0 };
 
     const segments = points.length - 1;
     const segmentIndex = Math.floor(t * segments);
@@ -116,6 +116,15 @@ class PointTracker {
 
   movePlayerAlongPath() {
     if (!this.isMoving) return;
+
+    // 安全检查
+    if (this.player.currentPointIndex === null || 
+        this.player.targetPointIndex === null || 
+        !this.path[this.player.currentPointIndex] || 
+        !this.path[this.player.targetPointIndex]) {
+      this.isMoving = false;
+      return;
+    }
 
     const currentPath = this.path[this.player.currentPointIndex];
     const targetPath = this.path[this.player.targetPointIndex];
@@ -190,7 +199,7 @@ class PointTracker {
     });
 
     if (clickedPoint && !this.isMoving) {
-      // 允许跨点点击，但必须是后续的点
+      // 安全检查
       const currentPointIndex = this.player.currentPointIndex;
       const clickedPointIndex = this.path.findIndex(p => p.number === clickedPoint.number);
 
