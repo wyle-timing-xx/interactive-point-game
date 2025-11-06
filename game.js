@@ -5,26 +5,18 @@ class PointTracker {
     
     // 定义带有控制点的精确路径
     this.path = [
-      { point: { x: 100, y: 50 }, controlPoint: { x: 150, y: 20 } },
-      { point: { x: 250, y: 50 }, controlPoint: { x: 200, y: 100 } },
-      { point: { x: 250, y: 200 }, controlPoint: { x: 300, y: 150 } },
-      { point: { x: 100, y: 200 }, controlPoint: { x: 180, y: 250 } },
-      { point: { x: 100, y: 350 }, controlPoint: { x: 50, y: 300 } }
+      { point: { x: 100, y: 50 }, number: 1, controlPoints: [{ x: 150, y: 20 }, { x: 180, y: 30 }] },
+      { point: { x: 250, y: 50 }, number: 2, controlPoints: [{ x: 200, y: 100 }, { x: 220, y: 80 }] },
+      { point: { x: 250, y: 200 }, number: 3, controlPoints: [{ x: 300, y: 150 }, { x: 280, y: 170 }] },
+      { point: { x: 100, y: 200 }, number: 4, controlPoints: [{ x: 180, y: 250 }, { x: 160, y: 230 }] },
+      { point: { x: 100, y: 350 }, number: 5, controlPoints: [{ x: 50, y: 300 }, { x: 70, y: 320 }] }
     ];
-
-    this.points = this.path.map((p, index) => ({
-      x: p.point.x, 
-      y: p.point.y, 
-      radius: 25, 
-      number: index + 1
-    }));
 
     this.player = { 
       x: 100, 
       y: 50, 
-      targetX: 100,
-      targetY: 50,
-      currentSegment: 0,
+      currentPoint: this.path[0],
+      targetPoint: null,
       progress: 0 
     };
 
@@ -41,11 +33,16 @@ class PointTracker {
     this.canvas.addEventListener('click', this.handleClick.bind(this));
   }
 
-  // 计算二次贝塞尔曲线上的点
-  getQuadraticBezierPoint(t, p0, p1, p2) {
-    const x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * p1.x + t * t * p2.x;
-    const y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * p1.y + t * t * p2.y;
-    return { x, y };
+  // 计算多点贝塞尔曲线上的点
+  getBezierPoint(t, points) {
+    if (points.length === 1) return points[0];
+    const newPoints = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const x = points[i].x * (1 - t) + points[i + 1].x * t;
+      const y = points[i].y * (1 - t) + points[i + 1].y * t;
+      newPoints.push({ x, y });
+    }
+    return this.getBezierPoint(t, newPoints);
   }
 
   // 绘制曲线路径
@@ -53,18 +50,16 @@ class PointTracker {
     this.ctx.beginPath();
     this.ctx.moveTo(this.path[0].point.x, this.path[0].point.y);
     
-    for (let i = 0; i < this.path.length - 1; i++) {
-      const start = this.path[i].point;
-      const end = this.path[i + 1].point;
-      const controlPoint = this.path[i].controlPoint;
-      
-      this.ctx.quadraticCurveTo(
-        controlPoint.x, 
-        controlPoint.y, 
-        end.x, 
-        end.y
-      );
-    }
+    this.path.forEach((point, index) => {
+      if (index < this.path.length - 1) {
+        const start = point.point;
+        const end = this.path[index + 1].point;
+        const controlPoints = [start, ...point.controlPoints, end];
+        
+        // 绘制贝塞尔曲线
+        this.ctx.lineTo(start.x, start.y);
+      }
+    });
     
     this.ctx.strokeStyle = 'black';
     this.ctx.lineWidth = 15;
@@ -74,42 +69,38 @@ class PointTracker {
   }
 
   movePlayerAlongPath() {
-    if (!this.isMoving) return;
+    if (!this.isMoving || !this.player.targetPoint) return;
 
-    // 找到当前需要移动的路径段
-    let currentSeg = null;
-    for (let i = 0; i < this.path.length - 1; i++) {
-      if (
-        (this.path[i].point.x === this.player.x && this.path[i].point.y === this.player.y) ||
-        (this.path[i + 1].point.x === this.player.targetX && this.path[i + 1].point.y === this.player.targetY)
-      ) {
-        currentSeg = this.path[i];
-        break;
-      }
-    }
-
-    if (!currentSeg) return;
-
-    const nextSeg = this.path[this.path.indexOf(currentSeg) + 1];
+    // 获取起点和终点
+    const startPoint = this.player.currentPoint.point;
+    const endPoint = this.player.targetPoint.point;
+    
+    // 获取所有控制点
+    const controlPoints = [
+      startPoint, 
+      ...this.player.currentPoint.controlPoints,
+      ...this.player.targetPoint.controlPoints.slice(0, -1),
+      endPoint
+    ];
 
     // 增加进度
     this.player.progress += 0.03; // 调整这个值控制移动速度
 
     // 计算当前位置
-    const currentPoint = this.getQuadraticBezierPoint(
+    const currentPoint = this.getBezierPoint(
       this.player.progress, 
-      currentSeg.point, 
-      currentSeg.controlPoint, 
-      nextSeg.point
+      controlPoints
     );
 
     this.player.x = currentPoint.x;
     this.player.y = currentPoint.y;
 
-    // 如果到达路径段末尾
+    // 如果到达路径末尾
     if (this.player.progress >= 1) {
-      this.player.x = nextSeg.point.x;
-      this.player.y = nextSeg.point.y;
+      this.player.x = endPoint.x;
+      this.player.y = endPoint.y;
+      this.player.currentPoint = this.player.targetPoint;
+      this.player.targetPoint = null;
       this.isMoving = false;
       this.player.progress = 0;
     }
@@ -125,9 +116,10 @@ class PointTracker {
     this.movePlayerAlongPath();
 
     // 绘制点
-    this.points.forEach(point => {
+    this.path.forEach(pathPoint => {
+      const point = pathPoint.point;
       this.ctx.beginPath();
-      this.ctx.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
+      this.ctx.arc(point.x, point.y, 25, 0, Math.PI * 2);
       this.ctx.fillStyle = '#FF0000';
       this.ctx.fill();
       
@@ -135,7 +127,7 @@ class PointTracker {
       this.ctx.font = 'bold 24px Arial';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
-      this.ctx.fillText(point.number, point.x, point.y);
+      this.ctx.fillText(pathPoint.number, point.x, point.y);
     });
 
     // 绘制玩家
@@ -152,23 +144,15 @@ class PointTracker {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    const clickedPoint = this.points.find(point => 
-      Math.sqrt((x - point.x)**2 + (y - point.y)**2) < point.radius
-    );
+    const clickedPoint = this.path.find(pathPoint => {
+      const point = pathPoint.point;
+      return Math.sqrt((x - point.x)**2 + (y - point.y)**2) < 25;
+    });
 
     if (clickedPoint && !this.isMoving) {
-      // 找到当前点和目标点在路径中的位置
-      const currentIndex = this.points.findIndex(p => 
-        p.x === this.player.x && p.y === this.player.y
-      );
-      const targetIndex = this.points.findIndex(p => 
-        p.number === clickedPoint.number
-      );
-
-      // 如果目标点与当前点不同
-      if (currentIndex !== targetIndex) {
-        this.player.targetX = clickedPoint.x;
-        this.player.targetY = clickedPoint.y;
+      // 如果点击的不是当前点
+      if (clickedPoint !== this.player.currentPoint) {
+        this.player.targetPoint = clickedPoint;
         this.isMoving = true;
         this.player.progress = 0;
       }
