@@ -3,7 +3,7 @@ class PointTracker {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     
-    // 定义更加精确的路径连接
+    // 定义完整的路径连接
     this.path = [
       { 
         point: { x: 100, y: 50 }, 
@@ -77,10 +77,8 @@ class PointTracker {
 
   // 计算插值点
   interpolatePoint(t, points) {
-    // 如果只有一个点，直接返回
     if (points.length <= 1) return points[0];
 
-    // 在相邻点之间插值
     const segments = points.length - 1;
     const segmentIndex = Math.floor(t * segments);
     const localT = (t * segments) % 1;
@@ -100,7 +98,6 @@ class PointTracker {
     this.path.forEach((pathPoint, index) => {
       const points = pathPoint.pathPoints;
       
-      // 绘制路径
       points.forEach((point, pIndex) => {
         if (pIndex === 0) {
           this.ctx.moveTo(point.x, point.y);
@@ -120,7 +117,6 @@ class PointTracker {
   movePlayerAlongPath() {
     if (!this.isMoving) return;
 
-    // 获取当前路径点和目标路径点
     const currentPath = this.path[this.player.currentPointIndex];
     const targetPath = this.path[this.player.targetPointIndex];
 
@@ -194,9 +190,13 @@ class PointTracker {
     });
 
     if (clickedPoint && !this.isMoving) {
-      // 只能点击下一个顺序的点
-      if (clickedPoint.number === this.path[this.player.currentPointIndex].number + 1) {
-        this.player.targetPointIndex = this.path.findIndex(p => p.number === clickedPoint.number);
+      // 允许跨点点击，但必须是后续的点
+      const currentPointIndex = this.player.currentPointIndex;
+      const clickedPointIndex = this.path.findIndex(p => p.number === clickedPoint.number);
+
+      // 检查点击的点是否在当前点之后
+      if (clickedPointIndex > currentPointIndex) {
+        this.player.targetPointIndex = clickedPointIndex;
         this.isMoving = true;
         this.player.pathProgress = 0;
       }
