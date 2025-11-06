@@ -1,4 +1,4 @@
-class PointGame {
+class PointTracker {
   constructor(canvasId) {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
@@ -22,11 +22,12 @@ class PointGame {
     this.player = { 
       x: 100, 
       y: 50, 
+      targetX: 100,
+      targetY: 50,
       currentSegment: 0,
       progress: 0 
     };
 
-    this.order = 'asc';
     this.isMoving = false;
 
     this.setupCanvas();
@@ -75,12 +76,24 @@ class PointGame {
   movePlayerAlongPath() {
     if (!this.isMoving) return;
 
-    // 当前路径段的起点、控制点和终点
-    const currentSeg = this.path[this.player.currentSegment];
-    const nextSeg = this.path[this.player.currentSegment + 1];
+    // 找到当前需要移动的路径段
+    let currentSeg = null;
+    for (let i = 0; i < this.path.length - 1; i++) {
+      if (
+        (this.path[i].point.x === this.player.x && this.path[i].point.y === this.player.y) ||
+        (this.path[i + 1].point.x === this.player.targetX && this.path[i + 1].point.y === this.player.targetY)
+      ) {
+        currentSeg = this.path[i];
+        break;
+      }
+    }
+
+    if (!currentSeg) return;
+
+    const nextSeg = this.path[this.path.indexOf(currentSeg) + 1];
 
     // 增加进度
-    this.player.progress += 0.02; // 调整这个值控制移动速度
+    this.player.progress += 0.03; // 调整这个值控制移动速度
 
     // 计算当前位置
     const currentPoint = this.getQuadraticBezierPoint(
@@ -95,14 +108,10 @@ class PointGame {
 
     // 如果到达路径段末尾
     if (this.player.progress >= 1) {
-      this.player.currentSegment++;
+      this.player.x = nextSeg.point.x;
+      this.player.y = nextSeg.point.y;
+      this.isMoving = false;
       this.player.progress = 0;
-
-      // 如果到达最后一个路径段
-      if (this.player.currentSegment >= this.path.length - 1) {
-        this.isMoving = false;
-        alert(`游戏完成！最终顺序：${this.order}`);
-      }
     }
   }
 
@@ -148,27 +157,25 @@ class PointGame {
     );
 
     if (clickedPoint && !this.isMoving) {
-      // 确定下一个点的索引
-      let nextPointIndex;
-      if (this.order === 'asc') {
-        nextPointIndex = this.points.findIndex(p => p.number === clickedPoint.number);
-      } else {
-        nextPointIndex = this.points.length - 1 - this.points.findIndex(p => p.number === clickedPoint.number);
-      }
+      // 找到当前点和目标点在路径中的位置
+      const currentIndex = this.points.findIndex(p => 
+        p.x === this.player.x && p.y === this.player.y
+      );
+      const targetIndex = this.points.findIndex(p => 
+        p.number === clickedPoint.number
+      );
 
-      // 如果点击的点在当前点之前或之后，则移动
-      if (Math.abs(nextPointIndex - this.player.currentSegment) === 1) {
+      // 如果目标点与当前点不同
+      if (currentIndex !== targetIndex) {
+        this.player.targetX = clickedPoint.x;
+        this.player.targetY = clickedPoint.y;
         this.isMoving = true;
-        this.player.currentSegment = nextPointIndex;
         this.player.progress = 0;
-
-        // 切换顺序
-        this.order = this.order === 'asc' ? 'desc' : 'asc';
       }
     }
   }
 }
 
 window.onload = () => {
-  new PointGame('gameCanvas');
+  new PointTracker('gameCanvas');
 };
