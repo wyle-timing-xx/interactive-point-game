@@ -3,17 +3,17 @@ class PointGame {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     this.points = [
-      { x: 100, y: 50, radius: 25, number: 1 },
-      { x: 250, y: 50, radius: 25, number: 2 },
-      { x: 250, y: 200, radius: 25, number: 3 },
-      { x: 100, y: 200, radius: 25, number: 4 },
-      { x: 100, y: 350, radius: 25, number: 5 }
+      { x: 100, y: 50, radius: 25, number: 1, controlPoints: [{ x: 150, y: 20 }] },
+      { x: 250, y: 50, radius: 25, number: 2, controlPoints: [{ x: 200, y: 100 }] },
+      { x: 250, y: 200, radius: 25, number: 3, controlPoints: [{ x: 300, y: 150 }] },
+      { x: 100, y: 200, radius: 25, number: 4, controlPoints: [{ x: 180, y: 250 }] },
+      { x: 100, y: 350, radius: 25, number: 5, controlPoints: [{ x: 50, y: 300 }] }
     ];
     this.currentPointIndex = 0;
     this.player = { x: 100, y: 50, targetX: 100, targetY: 50 };
     this.isMoving = false;
     this.moveSpeed = 2;
-    this.order = 'asc'; // 默认正序
+    this.order = 'asc';
 
     this.setupCanvas();
     this.animate();
@@ -26,19 +26,36 @@ class PointGame {
     this.canvas.addEventListener('click', this.handleClick.bind(this));
   }
 
+  // 绘制曲线路径
+  drawCurvedPath() {
+    this.ctx.beginPath();
+    this.ctx.moveTo(this.points[0].x, this.points[0].y);
+    
+    for (let i = 0; i < this.points.length - 1; i++) {
+      const start = this.points[i];
+      const end = this.points[i + 1];
+      const controlPoint = start.controlPoints[0];
+      
+      this.ctx.quadraticCurveTo(
+        controlPoint.x, 
+        controlPoint.y, 
+        end.x, 
+        end.y
+      );
+    }
+    
+    this.ctx.strokeStyle = 'black';
+    this.ctx.lineWidth = 15;
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+    this.ctx.stroke();
+  }
+
   animate() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
-    // 绘制弯曲路径
-    this.ctx.beginPath();
-    this.ctx.moveTo(100, 50);
-    this.ctx.lineTo(250, 50);
-    this.ctx.lineTo(250, 200);
-    this.ctx.lineTo(100, 200);
-    this.ctx.lineTo(100, 350);
-    this.ctx.strokeStyle = 'black';
-    this.ctx.lineWidth = 15;
-    this.ctx.stroke();
+    // 绘制曲线路径
+    this.drawCurvedPath();
 
     // 绘制点
     this.points.forEach(point => {
