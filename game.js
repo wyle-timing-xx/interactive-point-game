@@ -3,21 +3,65 @@ class PointTracker {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     
-    // 定义带有控制点的精确路径
+    // 定义更加曲折的路径，带有严格的顺序
     this.path = [
-      { point: { x: 100, y: 50 }, number: 1, controlPoints: [{ x: 150, y: 20 }, { x: 180, y: 30 }] },
-      { point: { x: 250, y: 50 }, number: 2, controlPoints: [{ x: 200, y: 100 }, { x: 220, y: 80 }] },
-      { point: { x: 250, y: 200 }, number: 3, controlPoints: [{ x: 300, y: 150 }, { x: 280, y: 170 }] },
-      { point: { x: 100, y: 200 }, number: 4, controlPoints: [{ x: 180, y: 250 }, { x: 160, y: 230 }] },
-      { point: { x: 100, y: 350 }, number: 5, controlPoints: [{ x: 50, y: 300 }, { x: 70, y: 320 }] }
+      { 
+        point: { x: 100, y: 50 }, 
+        number: 1, 
+        nextPoints: [2],
+        pathPoints: [
+          { x: 100, y: 50 },
+          { x: 150, y: 30 },
+          { x: 200, y: 50 }
+        ]
+      },
+      { 
+        point: { x: 250, y: 50 }, 
+        number: 2, 
+        nextPoints: [3],
+        pathPoints: [
+          { x: 250, y: 50 },
+          { x: 280, y: 100 },
+          { x: 250, y: 150 }
+        ]
+      },
+      { 
+        point: { x: 250, y: 200 }, 
+        number: 3, 
+        nextPoints: [4],
+        pathPoints: [
+          { x: 250, y: 200 },
+          { x: 200, y: 250 },
+          { x: 150, y: 200 }
+        ]
+      },
+      { 
+        point: { x: 100, y: 200 }, 
+        number: 4, 
+        nextPoints: [5],
+        pathPoints: [
+          { x: 100, y: 200 },
+          { x: 80, y: 300 },
+          { x: 100, y: 350 }
+        ]
+      },
+      { 
+        point: { x: 100, y: 350 }, 
+        number: 5, 
+        nextPoints: [],
+        pathPoints: [
+          { x: 100, y: 350 }
+        ]
+      }
     ];
 
     this.player = { 
       x: 100, 
       y: 50, 
-      currentPoint: this.path[0],
-      targetPoint: null,
-      progress: 0 
+      currentPointIndex: 0,
+      targetPointIndex: null,
+      pathProgress: 0,
+      currentPathProgress: 0
     };
 
     this.isMoving = false;
@@ -33,31 +77,39 @@ class PointTracker {
     this.canvas.addEventListener('click', this.handleClick.bind(this));
   }
 
-  // 计算多点贝塞尔曲线上的点
-  getBezierPoint(t, points) {
-    if (points.length === 1) return points[0];
-    const newPoints = [];
-    for (let i = 0; i < points.length - 1; i++) {
-      const x = points[i].x * (1 - t) + points[i + 1].x * t;
-      const y = points[i].y * (1 - t) + points[i + 1].y * t;
-      newPoints.push({ x, y });
-    }
-    return this.getBezierPoint(t, newPoints);
+  // 计算插值点
+  interpolatePoint(t, points) {
+    // 如果只有一个点，直接返回
+    if (points.length <= 1) return points[0];
+
+    // 在相邻点之间插值
+    const segments = points.length - 1;
+    const segmentIndex = Math.floor(t * segments);
+    const localT = (t * segments) % 1;
+
+    const start = points[segmentIndex];
+    const end = points[segmentIndex + 1];
+
+    return {
+      x: start.x + (end.x - start.x) * localT,
+      y: start.y + (end.y - start.y) * localT
+    };
   }
 
-  // 绘制曲线路径
-  drawCurvedPath() {
+  // 绘制曲折路径
+  drawWinidngPath() {
     this.ctx.beginPath();
-    this.ctx.moveTo(this.path[0].point.x, this.path[0].point.y);
-    
-    this.path.forEach((point, index) => {
+    this.path.forEach((pathPoint, index) => {
       if (index < this.path.length - 1) {
-        const start = point.point;
-        const end = this.path[index + 1].point;
-        const controlPoints = [start, ...point.controlPoints, end];
+        const points = pathPoint.pathPoints;
+        this.ctx.moveTo(points[0].x, points[0].y);
         
-        // 绘制贝塞尔曲线
-        this.ctx.lineTo(start.x, start.y);
+        // 绘制路径上的所有点
+        points.forEach((point, pIndex) => {
+          if (pIndex > 0) {
+            this.ctx.lineTo(point.x, point.y);
+          }
+        });
       }
     });
     
@@ -69,48 +121,45 @@ class PointTracker {
   }
 
   movePlayerAlongPath() {
-    if (!this.isMoving || !this.player.targetPoint) return;
+    if (!this.isMoving) return;
 
-    // 获取起点和终点
-    const startPoint = this.player.currentPoint.point;
-    const endPoint = this.player.targetPoint.point;
-    
-    // 获取所有控制点
-    const controlPoints = [
-      startPoint, 
-      ...this.player.currentPoint.controlPoints,
-      ...this.player.targetPoint.controlPoints.slice(0, -1),
-      endPoint
-    ];
+    // 获取当前路径点和目标路径点
+    const currentPath = this.path[this.player.currentPointIndex];
+    const targetPath = this.path[this.player.targetPointIndex];
 
-    // 增加进度
-    this.player.progress += 0.03; // 调整这个值控制移动速度
+    // 增加路径进度
+    this.player.pathProgress += 0.02; // 控制移动速度
+    this.player.currentPathProgress = this.player.pathProgress;
 
-    // 计算当前位置
-    const currentPoint = this.getBezierPoint(
-      this.player.progress, 
-      controlPoints
+    // 获取当前路径上的位置
+    const currentPathPoints = currentPath.pathPoints;
+    const currentPoint = this.interpolatePoint(
+      this.player.currentPathProgress, 
+      currentPathPoints
     );
 
+    // 更新玩家位置
     this.player.x = currentPoint.x;
     this.player.y = currentPoint.y;
 
-    // 如果到达路径末尾
-    if (this.player.progress >= 1) {
-      this.player.x = endPoint.x;
-      this.player.y = endPoint.y;
-      this.player.currentPoint = this.player.targetPoint;
-      this.player.targetPoint = null;
+    // 判断是否到达终点
+    if (this.player.pathProgress >= 1) {
+      // 移动到目标点
+      this.player.x = targetPath.point.x;
+      this.player.y = targetPath.point.y;
+      this.player.currentPointIndex = this.player.targetPointIndex;
+      this.player.targetPointIndex = null;
       this.isMoving = false;
-      this.player.progress = 0;
+      this.player.pathProgress = 0;
+      this.player.currentPathProgress = 0;
     }
   }
 
   animate() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     
-    // 绘制曲线路径
-    this.drawCurvedPath();
+    // 绘制曲折路径
+    this.drawWinidngPath();
 
     // 移动玩家
     this.movePlayerAlongPath();
@@ -150,11 +199,13 @@ class PointTracker {
     });
 
     if (clickedPoint && !this.isMoving) {
-      // 如果点击的不是当前点
-      if (clickedPoint !== this.player.currentPoint) {
-        this.player.targetPoint = clickedPoint;
+      // 检查是否是当前点的下一个可选点
+      const currentPath = this.path[this.player.currentPointIndex];
+      if (currentPath.nextPoints.includes(clickedPoint.number)) {
+        this.player.targetPointIndex = this.path.findIndex(p => p.number === clickedPoint.number);
         this.isMoving = true;
-        this.player.progress = 0;
+        this.player.pathProgress = 0;
+        this.player.currentPathProgress = 0;
       }
     }
   }
